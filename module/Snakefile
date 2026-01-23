@@ -1,0 +1,18 @@
+rule deepcytoftool:
+    input:
+        train_matrix="data.train_matrix",
+        train_labels="data.train_labels",
+        test_matrix="data.test_matrix"
+    output:
+        pred="analysis.prediction.deepcytof"
+    params:
+        name="{dataset}"
+    shell:
+        """
+        python {workflow.basedir}/entrypoint_deepcytof.py \
+            --output_dir $(dirname {output.pred}) \
+            --name {params.name} \
+            --data.train_matrix {input.train_matrix} \
+            --data.train_labels {input.train_labels} \
+            --data.test_matrix {input.test_matrix}
+        """

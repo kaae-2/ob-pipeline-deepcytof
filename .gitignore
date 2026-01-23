@@ -1,0 +1,7 @@
+test_output/
+tiny_temp/
+savemodels/
+__pycache__/
+*.tar.gz
+*.csv
+.snakemake/
