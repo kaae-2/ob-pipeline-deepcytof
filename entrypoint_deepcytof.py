@@ -40,6 +40,7 @@ def main():
     if tmp_extract.exists(): shutil.rmtree(tmp_extract)
     tmp_extract.mkdir(parents=True, exist_ok=True)
 
+    print("DeepCyTOF: extracting inputs", flush=True)
     train_x_csv = extract_if_tar(args.train_matrix, tmp_extract)
     train_y_csv = extract_if_tar(args.train_labels, tmp_extract)
     test_x_csv = str(Path(args.test_matrix).resolve())
@@ -58,6 +59,7 @@ def main():
     ]
 
     print(f"Snakemake Rule Start: {args.name}", flush=True)
+    print("DeepCyTOF: launching pipeline", flush=True)
     
     # Real-time output streaming
     process = subprocess.Popen(
@@ -88,6 +90,7 @@ def main():
         sys.exit(process.returncode)
 
     shutil.rmtree(tmp_extract)
+    print("DeepCyTOF: pipeline completed", flush=True)
     print(f"SUCCESS: {args.name} finished.", flush=True)
 
 if __name__ == "__main__":
