@@ -3,9 +3,11 @@ import os
 import sys
 import tarfile
 import tempfile
+import re
+import contextlib
+import io
 import pandas as pd
 import argparse
-import gzip
 from pathlib import Path
 
 # Prevent Matplotlib from hanging on font-cache building
@@ -14,6 +16,7 @@ matplotlib.use('Agg')
 
 # Fix for Protobuf legacy issues
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
@@ -33,6 +36,19 @@ def extract_first_csv_from_tar(path_str, temp_dir):
         tar.extract(member, path=temp_dir)
         return str(Path(temp_dir) / member.name)
 
+
+def extract_sample_number(sample_name):
+    base = os.path.basename(sample_name)
+    while True:
+        root, ext = os.path.splitext(base)
+        if not ext:
+            break
+        base = root
+    match = re.search(r"(\d+)(?!.*\d)", base)
+    if match:
+        return match.group(1)
+    return None
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_x', required=True)
@@ -48,11 +64,13 @@ def main():
         train_y_csv = extract_first_csv_from_tar(args.train_y, tmpdir)
         
         runner = DeepCyTOFRunner(dataset_name=args.dataset_name, output_dir=tmpdir)
-        runner.train(train_x_csv, train_y_csv)
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner.train(train_x_csv, train_y_csv)
 
         print("--- Processing Test Samples ---", flush=True)
         prediction_files = []
         test_path = Path(args.test_x)
+        tar_test = None
 
         if test_path.suffix in ['.csv', '.txt']:
             test_list = [test_path]
@@ -60,30 +78,35 @@ def main():
         else:
             is_tar = True
             tar_test = tarfile.open(test_path, "r:*")
-            test_list = [m for m in tar_test.getmembers() if m.name.endswith('.csv') and m.isfile()]
+            test_list = [
+                m for m in tar_test.getmembers() if m.name.endswith('.csv') and m.isfile()
+            ]
 
-        for item in test_list:
+        print(f"--- Processing {len(test_list)} samples ---", flush=True)
+        for idx, item in enumerate(test_list, start=1):
             item_name = item.name if is_tar else item.name
-            print(f"--- Starting Sample: {item_name} ---", flush=True)
             
             if is_tar:
+                assert tar_test is not None
+                assert isinstance(item, tarfile.TarInfo)
                 tar_test.extract(item, path=tmpdir)
                 sample_path = os.path.join(tmpdir, item.name)
             else:
                 sample_path = str(item)
 
-            predictions = runner.predict(sample_path)
+            with contextlib.redirect_stdout(io.StringIO()):
+                predictions = runner.predict(sample_path)
             
-            out_name = os.path.basename(item_name).replace(".csv", ".predictions.csv.gz")
+            sample_number = extract_sample_number(item_name) or str(idx)
+            out_name = f"{args.dataset_name}-prediction-{sample_number}.csv"
             out_path = os.path.join(tmpdir, out_name)
-            
-            with gzip.open(out_path, "wt") as f:
-                pd.Series(predictions).to_csv(f, index=False, header=False)
+
+            pd.Series(predictions).to_csv(out_path, index=False, header=False)
             
             prediction_files.append(out_path)
-            print(f"--- Finished Sample: {item_name} ---", flush=True)
 
         if is_tar:
+            assert tar_test is not None
             tar_test.close()
 
         with tarfile.open(args.output_file, "w:gz") as tar_out:

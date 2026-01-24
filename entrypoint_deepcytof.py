@@ -12,13 +12,15 @@ def extract_if_tar(file_path, extract_to):
     if any(path.name.endswith(ext) for ext in ['.tar.gz', '.tar', '.tgz']):
         print(f"Snakemake Job: Extracting {path.name}...", flush=True)
         with tarfile.open(path, "r:*") as tar:
-            tar.extractall(path=extract_to)
+            try:
+                tar.extractall(path=extract_to, filter="data")
+            except TypeError:
+                tar.extractall(path=extract_to)
             # Find all relevant files
             extracted_files = [f for f in extract_to.glob("**/*") if f.suffix in ['.csv', '.txt'] and f.is_file()]
             if extracted_files:
                 # Sort to ensure deterministic behavior in Snakemake
                 extracted_files.sort()
-                print(f"DEBUG: Found {len(extracted_files)} files. Using: {extracted_files[0].name}", flush=True)
                 return str(extracted_files[0].resolve())
     return str(path)
 
@@ -40,7 +42,7 @@ def main():
 
     train_x_csv = extract_if_tar(args.train_matrix, tmp_extract)
     train_y_csv = extract_if_tar(args.train_labels, tmp_extract)
-    test_x_csv = extract_if_tar(args.test_matrix, tmp_extract)
+    test_x_csv = str(Path(args.test_matrix).resolve())
 
     repo_root = Path(__file__).resolve().parent
     run_script = repo_root / "deepcytof_pipeline" / "run_deepcytof.py"
@@ -66,12 +68,22 @@ def main():
         bufsize=1
     )
 
-    for line in process.stdout:
-        print(f"[{args.name}] {line}", end='', flush=True)
+    output_lines = []
+    status_prefixes = (
+        "--- Preparing",
+        "--- Processing",
+        "DeepCyTOF complete",
+    )
+    if process.stdout is not None:
+        for line in process.stdout:
+            output_lines.append(line)
+            if line.startswith(status_prefixes):
+                print(f"[{args.name}] {line}", end='', flush=True)
 
     process.wait()
 
     if process.returncode != 0:
+        sys.stderr.write("".join(output_lines))
         print(f"ERROR: {args.name} failed with exit code {process.returncode}", flush=True)
         sys.exit(process.returncode)
 
