@@ -19,6 +19,11 @@ matplotlib.use('Agg')
 # Fix for Protobuf legacy issues
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("OMP_NUM_THREADS", "16")
+os.environ.setdefault("MKL_NUM_THREADS", "16")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "16")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "16")
 
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
@@ -85,7 +90,6 @@ def main():
         print("--- Processing Test Samples ---", flush=True)
         log_ts("Starting test sample processing")
         test_start = time.time()
-        prediction_files = []
         test_path = Path(args.test_x)
         tar_test = None
 
@@ -100,35 +104,42 @@ def main():
             ]
 
         print(f"--- Processing {len(test_list)} samples ---", flush=True)
-        for idx, item in enumerate(test_list, start=1):
-            item_name = item.name if is_tar else item.name
-            
-            if is_tar:
-                assert tar_test is not None
-                assert isinstance(item, tarfile.TarInfo)
-                tar_test.extract(item, path=tmpdir)
-                sample_path = os.path.join(tmpdir, item.name)
-            else:
-                sample_path = str(item)
+        with tarfile.open(args.output_file, "w:gz") as tar_out:
+            for idx, item in enumerate(test_list, start=1):
+                item_name = item.name if is_tar else item.name
+                log_ts(f"Predicting sample {idx}/{len(test_list)}: {os.path.basename(item_name)}")
 
-            with contextlib.redirect_stdout(io.StringIO()):
-                predictions = runner.predict(sample_path)
-            
-            sample_number = extract_sample_number(item_name) or str(idx)
-            out_name = f"{args.dataset_name}-prediction-{sample_number}.csv"
-            out_path = os.path.join(tmpdir, out_name)
+                if is_tar:
+                    assert tar_test is not None
+                    assert isinstance(item, tarfile.TarInfo)
+                    sample_file = tar_test.extractfile(item)
+                    if sample_file is None:
+                        continue
+                    try:
+                        df_x = pd.read_csv(sample_file, header=None, dtype="float32")
+                    finally:
+                        sample_file.close()
+                else:
+                    df_x = pd.read_csv(str(item), header=None, dtype="float32")
 
-            pd.Series(predictions).to_csv(out_path, index=False, header=False)
-            
-            prediction_files.append(out_path)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    predictions = runner.predict_df(df_x, sample_name=os.path.basename(item_name))
+
+                log_ts(f"Finished sample {idx}/{len(test_list)}: {os.path.basename(item_name)}")
+
+                sample_number = extract_sample_number(item_name) or str(idx)
+                out_name = f"{args.dataset_name}-prediction-{sample_number}.csv"
+
+                csv_buffer = io.StringIO()
+                pd.Series(predictions).to_csv(csv_buffer, index=False, header=False)
+                data = csv_buffer.getvalue().encode("utf-8")
+                tar_info = tarfile.TarInfo(name=os.path.basename(out_name))
+                tar_info.size = len(data)
+                tar_out.addfile(tar_info, io.BytesIO(data))
 
         if is_tar:
             assert tar_test is not None
             tar_test.close()
-
-        with tarfile.open(args.output_file, "w:gz") as tar_out:
-            for pf in prediction_files:
-                tar_out.add(pf, arcname=os.path.basename(pf))
 
         log_ts(f"Test sample processing completed in {time.time() - test_start:.2f}s")
 

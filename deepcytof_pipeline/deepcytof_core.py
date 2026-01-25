@@ -28,7 +28,6 @@ for p in paths_to_add:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-import Monitoring as mn
 from Util import denoisingAutoEncoder as dae
 from Util import DataHandler as dh
 from Util import feedforwadClassifier as net
@@ -49,6 +48,7 @@ class DeepCyTOFRunner:
         self.dae_model = None
         self.preprocessor = None
         self.marker_names = None
+        self.skip_mmd = os.environ.get("DEEPCYTOF_SKIP_MMD", "1") == "1"
 
     def train(self, x_path, y_path):
         def log_ts(message: str) -> None:
@@ -57,8 +57,8 @@ class DeepCyTOFRunner:
 
         log_ts("Loading training data")
         load_start = time.time()
-        df_x = pd.read_csv(x_path, header=None)
-        X = df_x.values.astype(np.float32)
+        df_x = pd.read_csv(x_path, header=None, dtype=np.float32)
+        X = df_x.values
 
         df_y = pd.read_csv(y_path, header=None)
         y_raw = df_y.iloc[:, 0].values.astype(str)
@@ -90,13 +90,12 @@ class DeepCyTOFRunner:
         log_ts(f"Training Feedforward Classifier completed in {time.time() - clf_start:.2f}s")
         log_ts("Training complete")
 
-    def predict(self, x_path):
+    def _predict_array(self, X, sample_name=None):
         import time
         start_time = time.time()
-        print(f"      -> Loading {os.path.basename(x_path)}...", flush=True)
-        df_x = pd.read_csv(x_path, header=None)
-        X = df_x.values.astype(np.float32)
-        
+        if sample_name:
+            print(f"      -> Loading {sample_name}...", flush=True)
+        X = np.asarray(X, dtype=np.float32)
         source = Sample(X)
         source = dh.preProcessSamplesCyTOFData(source)
         
@@ -105,20 +104,28 @@ class DeepCyTOFRunner:
         denoise_source, _ = dh.standard_scale(denoise_source, preprocessor=self.preprocessor)
         
         # --- MMD MONITORING ---
-        print(f"      -> Starting MMD Calibration at {time.strftime('%H:%M:%S')}...", flush=True)
-        print(f"      -> Sample size: {len(X)} cells. Large samples (>10k) will take time.", flush=True)
-        
-        probs = self.model.predict(denoise_source.X)
-        init_preds = np.argmax(probs, axis=1)
-        
-        calibrated_source = mmd.calibrate(self.target_denoised, denoise_source, 
-                                         0, init_preds, str(self.dataset_name))
-        
-        mmd_end = time.time()
-        print(f"      -> MMD Calibration finished in {round(mmd_end - start_time, 2)} seconds.", flush=True)
+        if self.skip_mmd:
+            calibrated_source = denoise_source
+        else:
+            probs = self.model.predict(denoise_source.X)
+            init_preds = np.argmax(probs, axis=1)
+            print(f"      -> Starting MMD Calibration at {time.strftime('%H:%M:%S')}...", flush=True)
+            print(f"      -> Sample size: {len(X)} cells. Large samples (>10k) will take time.", flush=True)
+            calibrated_source = mmd.calibrate(self.target_denoised, denoise_source, 
+                                             0, init_preds, str(self.dataset_name))
+            mmd_end = time.time()
+            print(f"      -> MMD Calibration finished in {round(mmd_end - start_time, 2)} seconds.", flush=True)
         
         print(f"      -> Running final classification...", flush=True)
         final_probs = self.model.predict(calibrated_source.X)
         final_idx = np.argmax(final_probs, axis=1)
         
         return self.encoder.inverse_transform(final_idx)
+
+    def predict(self, x_path):
+        df_x = pd.read_csv(x_path, header=None, dtype=np.float32)
+        sample_name = os.path.basename(x_path)
+        return self._predict_array(df_x.values, sample_name=sample_name)
+
+    def predict_df(self, df_x, sample_name=None):
+        return self._predict_array(df_x.values, sample_name=sample_name)

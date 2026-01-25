@@ -11,15 +11,27 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import os.path
+import os
 
 import CostFunctions as cf
-import Monitoring as mn
 from Util import FileIO as io
 
 class Sample:
     def __init__(self, X, y=None):
         self.X = X
         self.y = y
+
+def _log_epoch(label, epoch, logs):
+    log_every = int(os.getenv("DEEPCYTOF_TRAIN_LOG_EVERY", "5"))
+    if log_every <= 0:
+        return
+    if (epoch + 1) % log_every != 0:
+        return
+    loss = None if logs is None else logs.get("loss")
+    if loss is None:
+        print(f"[{label}] epoch {epoch + 1}", flush=True)
+    else:
+        print(f"[{label}] epoch {epoch + 1} loss={loss:.4f}", flush=True)
 
 def step_decay(epoch):
     initial_lrate = 1e-5
@@ -118,7 +130,9 @@ def calibrate(target, source, sourceIndex, predLabel, path):
     # Subsampling with Index Fix (.ravel())
     n_target = target.X.shape[0]
     p_target = np.random.permutation(n_target)
-    toTake_target = p_target[range(int(.2*n_target))] 
+    mmd_subsample = float(os.getenv("DEEPCYTOF_MMD_SUBSAMPLE", "0.05"))
+    n_target_take = min(n_target, max(1, int(mmd_subsample * n_target)))
+    toTake_target = p_target[range(n_target_take)] 
     targetXMMD = target.X[toTake_target]
     targetYMMD = target.y[toTake_target]
     
@@ -130,7 +144,8 @@ def calibrate(target, source, sourceIndex, predLabel, path):
 
     n_source = source.X.shape[0]
     p_source = np.random.permutation(n_source)
-    toTake_source = p_source[range(int(.2*n_source))] 
+    n_source_take = min(n_source, max(1, int(mmd_subsample * n_source)))
+    toTake_source = p_source[range(n_source_take)] 
     sourceXMMD = source.X[toTake_source]
     sourceYMMD = predLabel[toTake_source]
     
@@ -149,12 +164,15 @@ def calibrate(target, source, sourceIndex, predLabel, path):
 
     sourceLabels = np.zeros(sourceXMMD.shape[0])
 
-    # Fit the calibration network - Verbose 1 for progress tracking
-    calibMMDNet.fit(sourceXMMD, sourceLabels, epochs=500,
-            batch_size=1000, validation_split=0.1, verbose=1,
-            callbacks=[lrate, mn.monitorMMD(sourceXMMD, sourceYMMD, targetXMMD,
-                                           targetYMMD, calibMMDNet.predict),
-              cb.EarlyStopping(monitor='val_loss', patience=20, mode='auto')])
+    mmd_epochs = int(os.getenv("DEEPCYTOF_MMD_EPOCHS", "20"))
+    mmd_batch_size = int(os.getenv("DEEPCYTOF_MMD_BATCH_SIZE", "20000"))
+    mmd_verbose = int(os.getenv("DEEPCYTOF_MMD_VERBOSE", "0"))
+    # Fit the calibration network
+    calibMMDNet.fit(sourceXMMD, sourceLabels, epochs=mmd_epochs,
+            batch_size=mmd_batch_size, validation_split=0.0, verbose=mmd_verbose,
+            callbacks=[lrate, cb.LambdaCallback(
+                on_epoch_end=lambda epoch, logs: _log_epoch("mmd", epoch, logs)
+            )])
     
     plt.close('all')
     

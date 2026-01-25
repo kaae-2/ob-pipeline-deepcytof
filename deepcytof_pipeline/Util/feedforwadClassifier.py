@@ -12,7 +12,6 @@ from keras import callbacks as cb
 from keras.callbacks import LearningRateScheduler
 import numpy as np
 import numpy.matlib  # <--- ADD THIS LINE
-import Monitoring as mn
 import sklearn.metrics
 import matplotlib
 import pylab as plt
@@ -25,7 +24,20 @@ from keras.metrics import sparse_categorical_crossentropy
 from keras.metrics import sparse_categorical_accuracy
 import keras.backend as K
 import os.path
+import os
 from Util import FileIO as io
+
+def _log_epoch(label, epoch, logs):
+    log_every = int(os.getenv("DEEPCYTOF_TRAIN_LOG_EVERY", "5"))
+    if log_every <= 0:
+        return
+    if (epoch + 1) % log_every != 0:
+        return
+    loss = None if logs is None else logs.get("loss")
+    if loss is None:
+        print(f"[{label}] epoch {epoch + 1}", flush=True)
+    else:
+        print(f"[{label}] epoch {epoch + 1} loss={loss:.4f}", flush=True)
 
 
 def step_decay(epoch):
@@ -116,11 +128,13 @@ def trainClassifier(trainSample, mode = 'None', i = 0,
 
     net.compile(optimizer = optimizer, 
                 loss = 'sparse_categorical_crossentropy')
-    net.fit(x_train, y_train, nb_epoch = 80, batch_size = 128, shuffle = True,
-            validation_split = 0.1, verbose = 0, 
-            callbacks=[lrate, mn.monitor(),
-            cb.EarlyStopping(monitor = 'val_loss',
-                             patience = 25, mode = 'auto')])
+    clf_epochs = int(os.getenv("DEEPCYTOF_CLF_EPOCHS", "10"))
+    clf_batch_size = int(os.getenv("DEEPCYTOF_CLF_BATCH_SIZE", "2048"))
+    net.fit(x_train, y_train, nb_epoch = clf_epochs, batch_size = clf_batch_size, shuffle = True,
+            validation_split = 0.0, verbose = 0, 
+            callbacks=[lrate, cb.LambdaCallback(
+                on_epoch_end=lambda epoch, logs: _log_epoch("clf", epoch, logs)
+            )])
     try:
         net.save(os.path.join(io.DeepLearningRoot(),
                               'savemodels/' + path + '/cellClassifier.h5'))
@@ -217,11 +231,13 @@ def plotHidden(trainSample, testSample, mode = 'None', i = 0,
 
     net.compile(optimizer = optimizer, 
                 loss = 'sparse_categorical_crossentropy')
-    net.fit(x_train, y_train, nb_epoch = 80, batch_size = 128, shuffle = True,
-            validation_split = 0.1, verbose = 0, 
-            callbacks=[lrate, mn.monitor(),
-            cb.EarlyStopping(monitor = 'val_loss',
-                             patience = 25, mode = 'auto')])
+    clf_epochs = int(os.getenv("DEEPCYTOF_CLF_EPOCHS", "10"))
+    clf_batch_size = int(os.getenv("DEEPCYTOF_CLF_BATCH_SIZE", "2048"))
+    net.fit(x_train, y_train, nb_epoch = clf_epochs, batch_size = clf_batch_size, shuffle = True,
+            validation_split = 0.0, verbose = 0, 
+            callbacks=[lrate, cb.LambdaCallback(
+                on_epoch_end=lambda epoch, logs: _log_epoch("clf", epoch, logs)
+            )])
     try:
         net.save(os.path.join(io.DeepLearningRoot(),
                               'savemodels/' + path + '/cellClassifier.h5'))
@@ -230,11 +246,6 @@ def plotHidden(trainSample, testSample, mode = 'None', i = 0,
     #plt.close('all')
     
     
-
-
-
-
-
 
 
 

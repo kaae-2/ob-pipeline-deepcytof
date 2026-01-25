@@ -4,8 +4,8 @@ from keras.models import Model
 from keras.regularizers import l2
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
-import Monitoring as mn
 from Util import DataHandler as dh
 import os.path
 from Util import FileIO as io
@@ -16,6 +16,22 @@ class Sample:
     def __init__(self, X, y = None):
         self.X = X
         self.y = y
+
+class TrainProgress(cb.Callback):
+    def __init__(self, label):
+        super().__init__()
+        self.label = label
+        self.log_every = int(os.getenv("DEEPCYTOF_TRAIN_LOG_EVERY", "5"))
+
+    def on_epoch_end(self, epoch, logs=None):
+        if self.log_every <= 0:
+            return
+        if (epoch + 1) % self.log_every == 0 or (epoch + 1) == self.params.get("epochs", epoch + 1):
+            loss = None if logs is None else logs.get("loss")
+            if loss is None:
+                print(f"[{self.label}] epoch {epoch + 1}/{self.params.get('epochs', epoch + 1)}", flush=True)
+            else:
+                print(f"[{self.label}] epoch {epoch + 1}/{self.params.get('epochs', epoch + 1)} loss={loss:.4f}", flush=True)
         
 def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
              keepProb, denoise, loadModel, path):
@@ -71,11 +87,12 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
         
             autoencoder = Model(input=input_cell, output=decoded)
             autoencoder.compile(optimizer='rmsprop', loss='mse')
-            autoencoder.fit(trainData_ae, trainTarget_ae, nb_epoch=80,
-                            batch_size=128, shuffle=True,
-                            validation_split=0.1, verbose = 0,
-                            callbacks=[mn.monitor(), cb.EarlyStopping(
-                            monitor='val_loss', patience=25,  mode='auto')])
+            dae_epochs = int(os.getenv("DEEPCYTOF_DAE_EPOCHS", "10"))
+            dae_batch_size = int(os.getenv("DEEPCYTOF_DAE_BATCH_SIZE", "2048"))
+            autoencoder.fit(trainData_ae, trainTarget_ae, nb_epoch=dae_epochs,
+                            batch_size=dae_batch_size, shuffle=True,
+                            validation_split=0.0, verbose = 0,
+                            callbacks=[TrainProgress("dae")])
             # --- SAFE SAVE START ---
             save_folder = os.path.join(io.DeepLearningRoot(), 'savemodels', path)
             
