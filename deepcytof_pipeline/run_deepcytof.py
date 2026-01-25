@@ -27,25 +27,6 @@ if str(THIS_DIR) not in sys.path:
 from deepcytof_core import DeepCyTOFRunner
 
 
-def log_gpu_status():
-    try:
-        import tensorflow as tf
-    except Exception as exc:
-        print(f"--- TensorFlow import failed: {exc}", flush=True)
-        return
-
-    try:
-        gpus = tf.config.list_physical_devices("GPU")
-    except Exception as exc:
-        print(f"--- TensorFlow GPU detection failed: {exc}", flush=True)
-        return
-
-    if gpus:
-        names = ", ".join([gpu.name for gpu in gpus])
-        print(f"--- TensorFlow GPUs detected: {names}", flush=True)
-    else:
-        print("--- TensorFlow GPUs detected: none (CPU-only)", flush=True)
-
 def log_ts(message: str) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"--- {timestamp} {message}", flush=True)
@@ -94,8 +75,6 @@ def main():
         train_y_csv = extract_first_csv_from_tar(args.train_y, tmpdir)
         log_ts(f"Extracted train_y in {time.time() - extract_start:.2f}s")
 
-        log_gpu_status()
-        
         runner = DeepCyTOFRunner(dataset_name=args.dataset_name, output_dir=tmpdir)
         log_ts("Starting model training")
         train_start = time.time()
