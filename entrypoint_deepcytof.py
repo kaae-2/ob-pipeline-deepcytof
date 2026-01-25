@@ -77,12 +77,20 @@ def main():
     log(f"Command: {' '.join(cmd)}")
     
     # Real-time output streaming
+    env = os.environ.copy()
+    env.setdefault("HSA_OVERRIDE_GFX_VERSION", "10.3.0")
+    env["LD_LIBRARY_PATH"] = f"/opt/rocm/lib:{env.get('LD_LIBRARY_PATH', '')}"
+    log(
+        "GPU overrides: HSA_OVERRIDE_GFX_VERSION="
+        f"{env['HSA_OVERRIDE_GFX_VERSION']} LD_LIBRARY_PATH=/opt/rocm/lib"
+    )
     process = subprocess.Popen(
-        cmd, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.STDOUT, 
-        text=True, 
-        bufsize=1
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        env=env,
     )
 
     output_lines = []
