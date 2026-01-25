@@ -12,9 +12,6 @@ from pathlib import Path
 import tensorflow as tf
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Reduce TF noise
 
-if hasattr(tf, "compat"):
-    tf.compat.v1.disable_eager_execution()
-
 from tensorflow import keras
 K = keras.backend
 initializations = keras.initializers
