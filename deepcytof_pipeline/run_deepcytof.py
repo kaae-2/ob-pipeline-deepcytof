@@ -151,10 +151,20 @@ def main():
                 )
 
                 try:
-                    with contextlib.redirect_stdout(io.StringIO()):
+                    pred_log = os.getenv("DEEPCYTOF_PRED_LOG", "0") == "1"
+                    if pred_log:
+                        log_ts(
+                            "Prediction logging enabled for sample: "
+                            f"{os.path.basename(item_name)}"
+                        )
                         predictions = runner.predict_df(
                             df_x, sample_name=os.path.basename(item_name)
                         )
+                    else:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            predictions = runner.predict_df(
+                                df_x, sample_name=os.path.basename(item_name)
+                            )
                 except Exception as exc:
                     log_ts(
                         "Prediction failed for sample: "

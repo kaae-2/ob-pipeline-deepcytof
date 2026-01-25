@@ -107,13 +107,21 @@ def main():
     # Real-time output streaming
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = "-1"
+    env.setdefault("PYTHONFAULTHANDLER", "1")
     env.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    env.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+    env.setdefault("OMP_NUM_THREADS", "2")
+    env.setdefault("MKL_NUM_THREADS", "2")
+    env.setdefault("OPENBLAS_NUM_THREADS", "2")
+    env.setdefault("TF_NUM_INTRAOP_THREADS", "2")
+    env.setdefault("TF_NUM_INTEROP_THREADS", "1")
     env.setdefault("DEEPCYTOF_DAE_EPOCHS", "1")
     env.setdefault("DEEPCYTOF_DAE_BATCH_SIZE", "4096")
     env.setdefault("DEEPCYTOF_CLF_EPOCHS", "1")
     env.setdefault("DEEPCYTOF_CLF_BATCH_SIZE", "4096")
     env.setdefault("DEEPCYTOF_TRAIN_LOG_EVERY", "0")
     env.setdefault("DEEPCYTOF_SKIP_MMD", "1")
+    env.setdefault("DEEPCYTOF_PRED_LOG", "1")
     log(
         "CPU overrides: CUDA_VISIBLE_DEVICES=-1 TF_CPP_MIN_LOG_LEVEL="
         f"{env['TF_CPP_MIN_LOG_LEVEL']}"
