@@ -68,8 +68,8 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
     if denoise:
         if loadModel:
             from tensorflow.keras.models import load_model
-            autoencoder = load_model(os.path.join(io.DeepLearningRoot(),
-                                                  'savemodels/' + path + '/denoisedAE.h5'))
+            autoencoder = load_model(os.path.join(dataPath,
+                                                  'savemodels', path, 'denoisedAE.h5'))
         else:
             # train de-noising auto encoder and save it.
             trainTarget_ae = np.concatenate([sourceX, target.X[toKeepT]],
@@ -103,7 +103,7 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
                             validation_split=0.0, verbose = 0,
                             callbacks=[TrainProgress("dae")])
             # --- SAFE SAVE START ---
-            save_folder = os.path.join(io.DeepLearningRoot(), 'savemodels', path)
+            save_folder = os.path.join(dataPath, 'savemodels', path)
             
             # Create the folder if it doesn't exist
             if not os.path.exists(save_folder):
