@@ -89,37 +89,62 @@ class DeepCyTOFRunner:
         import time
         start_time = time.time()
         pred_batch_size = int(os.getenv("DEEPCYTOF_PRED_BATCH_SIZE", "2048"))
+        pred_chunk_size = int(os.getenv("DEEPCYTOF_PRED_CHUNK_SIZE", "0"))
         if sample_name:
             print(f"      -> Loading {sample_name}...", flush=True)
         X = np.asarray(X, dtype=np.float32)
-        source = Sample(X)
-        source = dh.preProcessSamplesCyTOFData(source)
-        
-        print(f"      -> Denoising source data...", flush=True)
-        denoise_source = dae.predictDAE(
-            source, self.dae_model, True, batch_size=pred_batch_size
-        )
-        denoise_source, _ = dh.standard_scale(denoise_source, preprocessor=self.preprocessor)
-        
-        # --- MMD MONITORING ---
-        if self.skip_mmd:
-            calibrated_source = denoise_source
-        else:
-            probs = self.model.predict(denoise_source.X)
-            init_preds = np.argmax(probs, axis=1)
-            print(f"      -> Starting MMD Calibration at {time.strftime('%H:%M:%S')}...", flush=True)
-            print(f"      -> Sample size: {len(X)} cells. Large samples (>10k) will take time.", flush=True)
-            calibrated_source = mmd.calibrate(self.target_denoised, denoise_source, 
-                                             0, init_preds, str(self.dataset_name))
-            mmd_end = time.time()
-            print(f"      -> MMD Calibration finished in {round(mmd_end - start_time, 2)} seconds.", flush=True)
-        
-        print(f"      -> Running final classification...", flush=True)
-        final_probs = self.model.predict(
-            calibrated_source.X, batch_size=pred_batch_size, verbose=0
-        )
-        final_idx = np.argmax(final_probs, axis=1)
-        
+        total_cells = X.shape[0]
+        if pred_chunk_size <= 0:
+            pred_chunk_size = total_cells
+
+        final_indices = []
+        for start in range(0, total_cells, pred_chunk_size):
+            end = min(start + pred_chunk_size, total_cells)
+            chunk = X[start:end]
+            print(f"      -> Processing cells {start + 1}-{end} of {total_cells}", flush=True)
+
+            source = Sample(chunk)
+            source = dh.preProcessSamplesCyTOFData(source)
+
+            print(f"      -> Denoising source data...", flush=True)
+            denoise_source = dae.predictDAE(
+                source, self.dae_model, True, batch_size=pred_batch_size
+            )
+            denoise_source, _ = dh.standard_scale(
+                denoise_source, preprocessor=self.preprocessor
+            )
+
+            # --- MMD MONITORING ---
+            if self.skip_mmd:
+                calibrated_source = denoise_source
+            else:
+                probs = self.model.predict(denoise_source.X)
+                init_preds = np.argmax(probs, axis=1)
+                print(
+                    f"      -> Starting MMD Calibration at {time.strftime('%H:%M:%S')}...",
+                    flush=True,
+                )
+                calibrated_source = mmd.calibrate(
+                    self.target_denoised,
+                    denoise_source,
+                    0,
+                    init_preds,
+                    str(self.dataset_name),
+                )
+                mmd_end = time.time()
+                print(
+                    "      -> MMD Calibration finished in "
+                    f"{round(mmd_end - start_time, 2)} seconds.",
+                    flush=True,
+                )
+
+            print(f"      -> Running final classification...", flush=True)
+            final_probs = self.model.predict(
+                calibrated_source.X, batch_size=pred_batch_size, verbose=0
+            )
+            final_indices.append(np.argmax(final_probs, axis=1))
+
+        final_idx = np.concatenate(final_indices)
         return self.encoder.inverse_transform(final_idx)
 
     def predict(self, x_path):
