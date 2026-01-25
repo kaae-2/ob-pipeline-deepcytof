@@ -1,7 +1,7 @@
-from keras import callbacks as cb
-from keras.layers import Input, Dense, merge, Dropout, Activation
-from keras.models import Model
-from keras.regularizers import l2
+from tensorflow.keras import callbacks as cb
+from tensorflow.keras.layers import Input, Dense, Dropout, Activation
+from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l2
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -67,7 +67,7 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
     
     if denoise:
         if loadModel:
-            from keras.models import load_model
+            from tensorflow.keras.models import load_model
             autoencoder = load_model(os.path.join(io.DeepLearningRoot(),
                                                   'savemodels/' + path + '/denoisedAE.h5'))
         else:
@@ -78,18 +78,27 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
                                                 size = trainTarget_ae.shape)
         
             input_cell = Input(shape=(inputDim,))
-            encoded = Dense(ae_encodingDim, activation='relu',
-                            W_regularizer=l2(l2_penalty_ae))(input_cell)
-            encoded1 = Dense(ae_encodingDim, activation='relu',
-                             W_regularizer=l2(l2_penalty_ae))(encoded)
-            decoded = Dense(inputDim, activation='linear',
-                            W_regularizer=l2(l2_penalty_ae))(encoded1)
+            encoded = Dense(
+                ae_encodingDim,
+                activation="relu",
+                kernel_regularizer=l2(l2_penalty_ae),
+            )(input_cell)
+            encoded1 = Dense(
+                ae_encodingDim,
+                activation="relu",
+                kernel_regularizer=l2(l2_penalty_ae),
+            )(encoded)
+            decoded = Dense(
+                inputDim,
+                activation="linear",
+                kernel_regularizer=l2(l2_penalty_ae),
+            )(encoded1)
         
-            autoencoder = Model(input=input_cell, output=decoded)
+            autoencoder = Model(inputs=input_cell, outputs=decoded)
             autoencoder.compile(optimizer='rmsprop', loss='mse')
             dae_epochs = int(os.getenv("DEEPCYTOF_DAE_EPOCHS", "10"))
             dae_batch_size = int(os.getenv("DEEPCYTOF_DAE_BATCH_SIZE", "2048"))
-            autoencoder.fit(trainData_ae, trainTarget_ae, nb_epoch=dae_epochs,
+            autoencoder.fit(trainData_ae, trainTarget_ae, epochs=dae_epochs,
                             batch_size=dae_batch_size, shuffle=True,
                             validation_split=0.0, verbose = 0,
                             callbacks=[TrainProgress("dae")])

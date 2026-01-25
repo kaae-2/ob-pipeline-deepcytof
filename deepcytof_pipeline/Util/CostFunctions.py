@@ -3,7 +3,7 @@ Created on Jul 13, 2016
 @author: Kelly P. Stanton
 '''
 import sys
-from keras import backend as K
+from tensorflow.keras import backend as K
 import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -76,19 +76,27 @@ class MMD:
         # FIX: Changed 'low' to 'minval' and 'high' to 'maxval' for TF 1.15 compatibility
         # Also using K.random_uniform directly with the sample size
         
-        sample_indices_train = K.cast(K.tf.random_uniform(
-            shape=[self.MMDTargetSampleSize], 
-            minval=0, 
-            maxval=self.MMDTargetTrainSize, 
-            dtype='float32'), IntType)
+        sample_indices_train = tf.cast(
+            tf.random.uniform(
+                shape=[self.MMDTargetSampleSize],
+                minval=0,
+                maxval=self.MMDTargetTrainSize,
+                dtype=tf.float32,
+            ),
+            IntType,
+        )
         
         MMDTargetSampleTrain = K.gather(self.MMDTargetTrain, sample_indices_train)
 
-        sample_indices_val = K.cast(K.tf.random_uniform(
-            shape=[self.MMDTargetSampleSize], 
-            minval=0, 
-            maxval=self.MMDTargetValidationSize, 
-            dtype='float32'), IntType)
+        sample_indices_val = tf.cast(
+            tf.random.uniform(
+                shape=[self.MMDTargetSampleSize],
+                minval=0,
+                maxval=self.MMDTargetValidationSize,
+                dtype=tf.float32,
+            ),
+            IntType,
+        )
             
         MMDTargetSampleValidation = K.gather(self.MMDTargetValidation, sample_indices_val)
 

@@ -10,16 +10,14 @@ from pathlib import Path
 
 # --- KERAS/TF SHIM ---
 import tensorflow as tf
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Reduce TF noise
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Reduce TF noise
 
-if hasattr(tf, 'compat'):
-    import tensorflow.compat.v1 as tf1
-    tf1.disable_eager_execution()
-    import keras.backend as K
-    from keras import initializers as initializations
-else:
-    import keras.backend as K
-    from keras import initializers as initializations
+if hasattr(tf, "compat"):
+    tf.compat.v1.disable_eager_execution()
+
+from tensorflow import keras
+K = keras.backend
+initializations = keras.initializers
 
 # --- LEGACY IMPORTS ---
 current_dir = Path(__file__).resolve().parent

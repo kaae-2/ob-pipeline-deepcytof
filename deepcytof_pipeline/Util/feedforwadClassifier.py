@@ -4,12 +4,12 @@ Created on Oct 10, 2016
 
 @author: huaminli
 '''
-from keras.layers import Input, Dense
-from keras.models import Model
-import keras.optimizers
-from keras.regularizers import l2
-from keras import callbacks as cb
-from keras.callbacks import LearningRateScheduler
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras import optimizers
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras import callbacks as cb
+from tensorflow.keras.callbacks import LearningRateScheduler
 import numpy as np
 import numpy.matlib  # <--- ADD THIS LINE
 import sklearn.metrics
@@ -20,9 +20,9 @@ from matplotlib import pyplot as plt1
 import math
 import random
 import tensorflow as tf
-from keras.metrics import sparse_categorical_crossentropy
-from keras.metrics import sparse_categorical_accuracy
-import keras.backend as K
+from tensorflow.keras.metrics import sparse_categorical_crossentropy
+from tensorflow.keras.metrics import sparse_categorical_accuracy
+from tensorflow.keras import backend as K
 import os.path
 import os
 from Util import FileIO as io
@@ -112,25 +112,34 @@ def trainClassifier(trainSample, mode = 'None', i = 0,
     
     # Construct a feed-forward neural network.
     inputLayer = Input(shape = (x_train.shape[1],))
-    hidden1 = Dense(hiddenLayersSizes[0], activation = activation,
-                    W_regularizer = l2(l2_penalty))(inputLayer)
-    hidden2 = Dense(hiddenLayersSizes[1], activation = activation,
-                    W_regularizer = l2(l2_penalty))(hidden1)
-    hidden3 = Dense(hiddenLayersSizes[2], activation = activation,
-                    W_regularizer = l2(l2_penalty))(hidden2)
+    hidden1 = Dense(
+        hiddenLayersSizes[0],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(inputLayer)
+    hidden2 = Dense(
+        hiddenLayersSizes[1],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(hidden1)
+    hidden3 = Dense(
+        hiddenLayersSizes[2],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(hidden2)
     numClasses = len(np.unique(trainSample.y)) - 1
     outputLayer = Dense(numClasses, activation = 'softmax')(hidden3)
     
-    encoder = Model(input = inputLayer, output = outputLayer)
-    net = Model(input = inputLayer, output = outputLayer)
+    encoder = Model(inputs=inputLayer, outputs=outputLayer)
+    net = Model(inputs=inputLayer, outputs=outputLayer)
     lrate = LearningRateScheduler(step_decay)
-    optimizer = keras.optimizers.rmsprop(lr = 0.0)
+    optimizer = optimizers.RMSprop(learning_rate=0.0)
 
     net.compile(optimizer = optimizer, 
                 loss = 'sparse_categorical_crossentropy')
     clf_epochs = int(os.getenv("DEEPCYTOF_CLF_EPOCHS", "10"))
     clf_batch_size = int(os.getenv("DEEPCYTOF_CLF_BATCH_SIZE", "2048"))
-    net.fit(x_train, y_train, nb_epoch = clf_epochs, batch_size = clf_batch_size, shuffle = True,
+    net.fit(x_train, y_train, epochs=clf_epochs, batch_size=clf_batch_size, shuffle=True,
             validation_split = 0.0, verbose = 0, 
             callbacks=[lrate, cb.LambdaCallback(
                 on_epoch_end=lambda epoch, logs: _log_epoch("clf", epoch, logs)
@@ -204,16 +213,25 @@ def plotHidden(trainSample, testSample, mode = 'None', i = 0,
     
     # Construct a feed-forward neural network.
     inputLayer = Input(shape = (x_train.shape[1],))
-    hidden1 = Dense(hiddenLayersSizes[0], activation = activation,
-                    W_regularizer = l2(l2_penalty))(inputLayer)
-    hidden2 = Dense(hiddenLayersSizes[1], activation = activation,
-                    W_regularizer = l2(l2_penalty))(hidden1)
-    hidden3 = Dense(hiddenLayersSizes[2], activation = activation,
-                    W_regularizer = l2(l2_penalty))(hidden2)
+    hidden1 = Dense(
+        hiddenLayersSizes[0],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(inputLayer)
+    hidden2 = Dense(
+        hiddenLayersSizes[1],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(hidden1)
+    hidden3 = Dense(
+        hiddenLayersSizes[2],
+        activation=activation,
+        kernel_regularizer=l2(l2_penalty),
+    )(hidden2)
     numClasses = len(np.unique(trainSample.y)) - 1
     outputLayer = Dense(numClasses, activation = 'softmax')(hidden3)
     
-    encoder = Model(input = inputLayer, output = hidden3)
+    encoder = Model(inputs=inputLayer, outputs=hidden3)
     # plot data in the 3rd hidden layer
     h3_data = encoder.predict(x_test, verbose = 0)
     #fig, (ax1) = plt1.subplots(1,1, subplot_kw={'projection':'3d'})
@@ -225,15 +243,15 @@ def plotHidden(trainSample, testSample, mode = 'None', i = 0,
     #ax1.set_title('data in 3rd hidden layer')
     plt1.show()
     
-    net = Model(input = inputLayer, output = outputLayer)
+    net = Model(inputs=inputLayer, outputs=outputLayer)
     lrate = LearningRateScheduler(step_decay)
-    optimizer = keras.optimizers.rmsprop(lr = 0.0)
+    optimizer = optimizers.RMSprop(learning_rate=0.0)
 
     net.compile(optimizer = optimizer, 
                 loss = 'sparse_categorical_crossentropy')
     clf_epochs = int(os.getenv("DEEPCYTOF_CLF_EPOCHS", "10"))
     clf_batch_size = int(os.getenv("DEEPCYTOF_CLF_BATCH_SIZE", "2048"))
-    net.fit(x_train, y_train, nb_epoch = clf_epochs, batch_size = clf_batch_size, shuffle = True,
+    net.fit(x_train, y_train, epochs=clf_epochs, batch_size=clf_batch_size, shuffle=True,
             validation_split = 0.0, verbose = 0, 
             callbacks=[lrate, cb.LambdaCallback(
                 on_epoch_end=lambda epoch, logs: _log_epoch("clf", epoch, logs)
@@ -246,7 +264,6 @@ def plotHidden(trainSample, testSample, mode = 'None', i = 0,
     #plt.close('all')
     
     
-
 
 
 

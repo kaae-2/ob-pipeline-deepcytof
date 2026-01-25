@@ -1,12 +1,10 @@
-from keras import callbacks as cb
-from keras.callbacks import LearningRateScheduler
-from keras import initializers
-# Use Add layer for ResNet skip connections
-from keras.layers import Input, Dense, Dropout, Activation, Add
-from keras.layers.normalization import BatchNormalization
-from keras.models import Model
-import keras.optimizers as opt
-from keras.regularizers import l2
+from tensorflow.keras import callbacks as cb
+from tensorflow.keras.callbacks import LearningRateScheduler
+from tensorflow.keras import initializers
+from tensorflow.keras.layers import Input, Dense, Dropout, Activation, Add, BatchNormalization
+from tensorflow.keras.models import Model
+from tensorflow.keras import optimizers as opt
+from tensorflow.keras.regularizers import l2
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -156,7 +154,7 @@ def calibrate(target, source, sourceIndex, predLabel, path):
     sourceYMMD = np.reshape(sourceYMMD, (-1, 1))
 
     lrate = LearningRateScheduler(step_decay)
-    optimizer = opt.rmsprop(lr=0.0)
+    optimizer = opt.RMSprop(learning_rate=0.0)
     
     calibMMDNet.compile(optimizer=optimizer, loss=lambda y_true, y_pred: 
        cf.MMD(block3_output, targetXMMD, 

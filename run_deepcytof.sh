@@ -3,7 +3,9 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 model_name="deepcytof"
-conda_env="deepcytof_legacy"
+conda_env="deepcytof_rocm"
+export HSA_OVERRIDE_GFX_VERSION="10.3.0"
+export LD_LIBRARY_PATH="/opt/rocm/lib:${LD_LIBRARY_PATH:-}"
 
 train_matrix="${script_dir}/out/data/data_preprocessing/default/data_import.train.matrix.tar.gz"
 train_labels="${script_dir}/out/data/data_preprocessing/default/data_import.train.labels.tar.gz"

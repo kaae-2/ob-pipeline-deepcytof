@@ -2,8 +2,7 @@ from sklearn import decomposition
 import matplotlib
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from keras.callbacks import Callback
-from keras import backend as K
+from tensorflow.keras.callbacks import Callback
 import numpy as np
 
 #object to monitor progress of a deep net and print other relevant info
