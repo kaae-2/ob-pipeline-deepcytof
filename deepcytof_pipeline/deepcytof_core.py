@@ -88,6 +88,7 @@ class DeepCyTOFRunner:
     def _predict_array(self, X, sample_name=None):
         import time
         start_time = time.time()
+        pred_batch_size = int(os.getenv("DEEPCYTOF_PRED_BATCH_SIZE", "2048"))
         if sample_name:
             print(f"      -> Loading {sample_name}...", flush=True)
         X = np.asarray(X, dtype=np.float32)
@@ -95,7 +96,9 @@ class DeepCyTOFRunner:
         source = dh.preProcessSamplesCyTOFData(source)
         
         print(f"      -> Denoising source data...", flush=True)
-        denoise_source = dae.predictDAE(source, self.dae_model, True)
+        denoise_source = dae.predictDAE(
+            source, self.dae_model, True, batch_size=pred_batch_size
+        )
         denoise_source, _ = dh.standard_scale(denoise_source, preprocessor=self.preprocessor)
         
         # --- MMD MONITORING ---
@@ -112,7 +115,9 @@ class DeepCyTOFRunner:
             print(f"      -> MMD Calibration finished in {round(mmd_end - start_time, 2)} seconds.", flush=True)
         
         print(f"      -> Running final classification...", flush=True)
-        final_probs = self.model.predict(calibrated_source.X)
+        final_probs = self.model.predict(
+            calibrated_source.X, batch_size=pred_batch_size, verbose=0
+        )
         final_idx = np.argmax(final_probs, axis=1)
         
         return self.encoder.inverse_transform(final_idx)

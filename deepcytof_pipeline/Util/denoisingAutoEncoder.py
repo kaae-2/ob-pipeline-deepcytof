@@ -120,10 +120,13 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
         
         return autoencoder
 
-def predictDAE(target, autoencoder, denoise = False):
-    if denoise:    
+def predictDAE(target, autoencoder, denoise = False, batch_size=None):
+    if denoise:
         # apply de-noising auto encoder to target.
-        denoiseTarget = Sample(autoencoder.predict(target.X), target.y)
+        predict_kwargs = {"verbose": 0}
+        if batch_size is not None:
+            predict_kwargs["batch_size"] = batch_size
+        denoiseTarget = Sample(autoencoder.predict(target.X, **predict_kwargs), target.y)
     else:
         denoiseTarget = Sample(target.X, target.y)
         

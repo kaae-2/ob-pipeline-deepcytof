@@ -116,9 +116,12 @@ def main():
     env.setdefault("TF_NUM_INTRAOP_THREADS", "2")
     env.setdefault("TF_NUM_INTEROP_THREADS", "1")
     env.setdefault("DEEPCYTOF_DAE_EPOCHS", "1")
-    env.setdefault("DEEPCYTOF_DAE_BATCH_SIZE", "4096")
+    env.setdefault("DEEPCYTOF_DAE_BATCH_SIZE", "2048")
     env.setdefault("DEEPCYTOF_CLF_EPOCHS", "1")
-    env.setdefault("DEEPCYTOF_CLF_BATCH_SIZE", "4096")
+    env.setdefault("DEEPCYTOF_CLF_BATCH_SIZE", "2048")
+    env.setdefault("DEEPCYTOF_PRED_BATCH_SIZE", "1024")
+    env.setdefault("DEEPCYTOF_MAX_PRED_CELLS", "20000")
+    env.setdefault("DEEPCYTOF_PRED_SEED", "42")
     env.setdefault("DEEPCYTOF_TRAIN_LOG_EVERY", "0")
     env.setdefault("DEEPCYTOF_SKIP_MMD", "1")
     env.setdefault("DEEPCYTOF_PRED_LOG", "1")
@@ -131,7 +134,9 @@ def main():
         f"{env['DEEPCYTOF_DAE_EPOCHS']} DAE_BATCH_SIZE="
         f"{env['DEEPCYTOF_DAE_BATCH_SIZE']} CLF_EPOCHS="
         f"{env['DEEPCYTOF_CLF_EPOCHS']} CLF_BATCH_SIZE="
-        f"{env['DEEPCYTOF_CLF_BATCH_SIZE']} SKIP_MMD="
+        f"{env['DEEPCYTOF_CLF_BATCH_SIZE']} PRED_BATCH_SIZE="
+        f"{env['DEEPCYTOF_PRED_BATCH_SIZE']} MAX_PRED_CELLS="
+        f"{env['DEEPCYTOF_MAX_PRED_CELLS']} SKIP_MMD="
         f"{env['DEEPCYTOF_SKIP_MMD']}"
     )
     run_tf_probe(env)
