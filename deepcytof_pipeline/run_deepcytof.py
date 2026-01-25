@@ -6,6 +6,8 @@ import tempfile
 import re
 import contextlib
 import io
+import time
+from datetime import datetime
 import pandas as pd
 import argparse
 from pathlib import Path
@@ -44,6 +46,10 @@ def log_gpu_status():
     else:
         print("--- TensorFlow GPUs detected: none (CPU-only)", flush=True)
 
+def log_ts(message: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"--- {timestamp} {message}", flush=True)
+
 def extract_first_csv_from_tar(path_str, temp_dir):
     path = Path(path_str).resolve()
     if path.suffix in ['.csv', '.txt']:
@@ -80,16 +86,26 @@ def main():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         print("--- Preparing Training Data ---", flush=True)
+        log_ts("Starting training data extraction")
+        extract_start = time.time()
         train_x_csv = extract_first_csv_from_tar(args.train_x, tmpdir)
+        log_ts(f"Extracted train_x in {time.time() - extract_start:.2f}s")
+        extract_start = time.time()
         train_y_csv = extract_first_csv_from_tar(args.train_y, tmpdir)
+        log_ts(f"Extracted train_y in {time.time() - extract_start:.2f}s")
 
         log_gpu_status()
         
         runner = DeepCyTOFRunner(dataset_name=args.dataset_name, output_dir=tmpdir)
+        log_ts("Starting model training")
+        train_start = time.time()
         with contextlib.redirect_stdout(io.StringIO()):
             runner.train(train_x_csv, train_y_csv)
+        log_ts(f"Model training completed in {time.time() - train_start:.2f}s")
 
         print("--- Processing Test Samples ---", flush=True)
+        log_ts("Starting test sample processing")
+        test_start = time.time()
         prediction_files = []
         test_path = Path(args.test_x)
         tar_test = None
@@ -134,6 +150,8 @@ def main():
         with tarfile.open(args.output_file, "w:gz") as tar_out:
             for pf in prediction_files:
                 tar_out.add(pf, arcname=os.path.basename(pf))
+
+        log_ts(f"Test sample processing completed in {time.time() - test_start:.2f}s")
 
     print(f"DeepCyTOF complete. Results saved to {args.output_file}", flush=True)
 
