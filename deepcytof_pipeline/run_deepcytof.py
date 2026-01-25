@@ -36,6 +36,27 @@ def log_ts(message: str) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"--- {timestamp} {message}", flush=True)
 
+
+def log_tf_devices() -> None:
+    log_ts(
+        "GPU env: ROCR_VISIBLE_DEVICES="
+        f"{os.environ.get('ROCR_VISIBLE_DEVICES')} HSA_OVERRIDE_GFX_VERSION="
+        f"{os.environ.get('HSA_OVERRIDE_GFX_VERSION')}"
+    )
+    try:
+        import tensorflow as tf
+    except Exception as exc:
+        log_ts(f"TensorFlow import failed: {exc}")
+        return
+
+    try:
+        gpus = tf.config.list_physical_devices("GPU")
+    except Exception as exc:
+        log_ts(f"TensorFlow GPU probe failed: {exc}")
+        return
+
+    log_ts(f"TensorFlow GPUs: {gpus}")
+
 def extract_first_csv_from_tar(path_str, temp_dir):
     path = Path(path_str).resolve()
     if path.suffix in ['.csv', '.txt']:
@@ -69,6 +90,8 @@ def main():
     parser.add_argument('--output_file', required=True)
     parser.add_argument('--dataset_name', default='cytof_data')
     args = parser.parse_args()
+
+    log_tf_devices()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         print("--- Preparing Training Data ---", flush=True)
@@ -122,8 +145,22 @@ def main():
                 else:
                     df_x = pd.read_csv(str(item), header=None, dtype="float32")
 
-                with contextlib.redirect_stdout(io.StringIO()):
-                    predictions = runner.predict_df(df_x, sample_name=os.path.basename(item_name))
+                log_ts(
+                    "Sample data shape: "
+                    f"{df_x.shape} dtypes={list(df_x.dtypes.unique())}"
+                )
+
+                try:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        predictions = runner.predict_df(
+                            df_x, sample_name=os.path.basename(item_name)
+                        )
+                except Exception as exc:
+                    log_ts(
+                        "Prediction failed for sample: "
+                        f"{os.path.basename(item_name)} error={exc}"
+                    )
+                    raise
 
                 log_ts(f"Finished sample {idx}/{len(test_list)}: {os.path.basename(item_name)}")
 

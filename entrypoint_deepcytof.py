@@ -12,6 +12,34 @@ def log(message: str) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[deepcytof] {timestamp} {message}", flush=True)
 
+
+def run_tf_probe(env: dict) -> None:
+    probe_cmd = [
+        sys.executable,
+        "-c",
+        "import tensorflow as tf; print('TF GPUs:', tf.config.list_physical_devices('GPU'))",
+    ]
+    log("Running TensorFlow GPU probe")
+    try:
+        result = subprocess.run(
+            probe_cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as exc:
+        log(f"TensorFlow GPU probe failed: {exc}")
+        return
+
+    if result.stdout:
+        for line in result.stdout.strip().splitlines():
+            log(f"TF probe stdout: {line}")
+    if result.stderr:
+        for line in result.stderr.strip().splitlines():
+            log(f"TF probe stderr: {line}")
+    log(f"TensorFlow GPU probe exit code: {result.returncode}")
+
 def extract_if_tar(file_path, extract_to):
     """Snakemake-safe extraction: returns absolute path to the extracted file."""
     path = Path(file_path).resolve()
@@ -78,12 +106,15 @@ def main():
     
     # Real-time output streaming
     env = os.environ.copy()
-    env.setdefault("HSA_OVERRIDE_GFX_VERSION", "10.3.0")
+    env.setdefault("ROCR_VISIBLE_DEVICES", "0")
+    env.setdefault("HSA_OVERRIDE_GFX_VERSION", "10.3.2")
     env["LD_LIBRARY_PATH"] = f"/opt/rocm/lib:{env.get('LD_LIBRARY_PATH', '')}"
     log(
-        "GPU overrides: HSA_OVERRIDE_GFX_VERSION="
+        "GPU overrides: ROCR_VISIBLE_DEVICES="
+        f"{env['ROCR_VISIBLE_DEVICES']} HSA_OVERRIDE_GFX_VERSION="
         f"{env['HSA_OVERRIDE_GFX_VERSION']} LD_LIBRARY_PATH=/opt/rocm/lib"
     )
+    run_tf_probe(env)
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
