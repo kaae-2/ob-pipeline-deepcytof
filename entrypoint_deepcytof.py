@@ -1,10 +1,16 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
 import subprocess
 import sys
 import tarfile
 import shutil
 import os
+
+
+def log(message: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[deepcytof] {timestamp} {message}", flush=True)
 
 def extract_if_tar(file_path, extract_to):
     """Snakemake-safe extraction: returns absolute path to the extracted file."""
@@ -35,15 +41,23 @@ def main():
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     tmp_extract = output_dir / f"tmp_{args.name}_extracted"
-    if tmp_extract.exists(): shutil.rmtree(tmp_extract)
+    if tmp_extract.exists():
+        log(f"Removing existing temp directory: {tmp_extract}")
+        shutil.rmtree(tmp_extract)
     tmp_extract.mkdir(parents=True, exist_ok=True)
 
-    print("DeepCyTOF: extracting inputs", flush=True)
+    log("Preparing inputs")
+    log(f"Input train matrix: {args.train_matrix}")
+    log(f"Input train labels: {args.train_labels}")
+    log(f"Input test matrix: {args.test_matrix}")
     train_x_csv = extract_if_tar(args.train_matrix, tmp_extract)
     train_y_csv = extract_if_tar(args.train_labels, tmp_extract)
     test_x_csv = str(Path(args.test_matrix).resolve())
+    log(f"Resolved train matrix: {train_x_csv}")
+    log(f"Resolved train labels: {train_y_csv}")
+    log(f"Resolved test matrix: {test_x_csv}")
 
     repo_root = Path(__file__).resolve().parent
     run_script = repo_root / "deepcytof_pipeline" / "run_deepcytof.py"
@@ -58,8 +72,9 @@ def main():
         "--dataset_name", args.name
     ]
 
-    print(f"Snakemake Rule Start: {args.name}", flush=True)
-    print("DeepCyTOF: launching pipeline", flush=True)
+    log(f"Snakemake Rule Start: {args.name}")
+    log("Launching DeepCyTOF pipeline")
+    log(f"Command: {' '.join(cmd)}")
     
     # Real-time output streaming
     process = subprocess.Popen(
@@ -83,6 +98,7 @@ def main():
                 print(f"[{args.name}] {line}", end='', flush=True)
 
     process.wait()
+    log(f"Pipeline process exited with code {process.returncode}")
 
     if process.returncode != 0:
         sys.stderr.write("".join(output_lines))
@@ -90,8 +106,8 @@ def main():
         sys.exit(process.returncode)
 
     shutil.rmtree(tmp_extract)
-    print("DeepCyTOF: pipeline completed", flush=True)
-    print(f"SUCCESS: {args.name} finished.", flush=True)
+    log("Pipeline completed")
+    log(f"SUCCESS: {args.name} finished")
 
 if __name__ == "__main__":
     main()
