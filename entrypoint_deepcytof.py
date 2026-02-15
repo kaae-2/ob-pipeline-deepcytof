@@ -65,6 +65,7 @@ def main():
     parser.add_argument("--data.train_matrix", dest="train_matrix", type=str, required=True)
     parser.add_argument("--data.train_labels", dest="train_labels", type=str, required=True)
     parser.add_argument("--data.test_matrix", dest="test_matrix", type=str, required=True)
+    parser.add_argument("--data.label_key", dest="label_key", type=str, required=False)
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).resolve()
