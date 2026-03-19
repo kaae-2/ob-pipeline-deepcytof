@@ -4,6 +4,9 @@
 
 Wraps DeepCyTOF training/inference for benchmark execution.
 
+The local wrapper now consumes preprocessing outputs as-is and skips the prior
+log/standard-scaling feature transforms inside the runner.
+
 - Entrypoint wrapper: `entrypoint_deepcytof.py`
 - Pipeline runner: `deepcytof_pipeline/run_deepcytof.py`
 - Local runner: `run_deepcytof.sh`

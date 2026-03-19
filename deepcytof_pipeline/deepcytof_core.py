@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from typing import cast
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -41,7 +42,6 @@ class DeepCyTOFRunner:
         self.encoder = LabelEncoder()
         self.model = None
         self.dae_model = None
-        self.preprocessor = None
         self.marker_names = None
         self.skip_mmd = os.environ.get("DEEPCYTOF_SKIP_MMD", "1") == "1"
 
@@ -57,13 +57,11 @@ class DeepCyTOFRunner:
 
         df_y = pd.read_csv(y_path, header=None)
         y_raw = df_y.iloc[:, 0].values.astype(str)
-        y_encoded = self.encoder.fit_transform(y_raw).reshape(-1, 1).astype(np.float32)
+        y_encoded_raw = self.encoder.fit_transform(y_raw)
+        y_encoded = np.asarray(y_encoded_raw, dtype=np.float32).reshape(-1, 1)
         log_ts(f"Loaded training data in {time.time() - load_start:.2f}s")
 
         target = Sample(X, y_encoded)
-        preprocess_start = time.time()
-        target = dh.preProcessSamplesCyTOFData(target)
-        log_ts(f"Preprocessed training data in {time.time() - preprocess_start:.2f}s")
 
         log_ts("Training AutoEncoder (DAE) start")
         dae_start = time.time()
@@ -74,7 +72,6 @@ class DeepCyTOFRunner:
         log_ts("Denoising target data start")
         denoise_start = time.time()
         denoise_target = dae.predictDAE(target, self.dae_model, True)
-        denoise_target, self.preprocessor = dh.standard_scale(denoise_target)
         log_ts(f"Denoising target data completed in {time.time() - denoise_start:.2f}s")
 
         log_ts("Training Feedforward Classifier start")
@@ -98,27 +95,29 @@ class DeepCyTOFRunner:
             pred_chunk_size = total_cells
 
         final_indices = []
+        if self.model is None:
+            raise ValueError("DeepCyTOF classifier is not trained.")
+        classifier_model = self.model
         for start in range(0, total_cells, pred_chunk_size):
             end = min(start + pred_chunk_size, total_cells)
             chunk = X[start:end]
             print(f"      -> Processing cells {start + 1}-{end} of {total_cells}", flush=True)
 
             source = Sample(chunk)
-            source = dh.preProcessSamplesCyTOFData(source)
 
             print(f"      -> Denoising source data...", flush=True)
             denoise_source = dae.predictDAE(
                 source, self.dae_model, True, batch_size=pred_batch_size
             )
-            denoise_source, _ = dh.standard_scale(
-                denoise_source, preprocessor=self.preprocessor
-            )
+            if denoise_source.X is None:
+                raise ValueError("DeepCyTOF denoised source matrix is missing.")
+            denoise_source_x = cast(np.ndarray, denoise_source.X)
 
             # --- MMD MONITORING ---
             if self.skip_mmd:
                 calibrated_source = denoise_source
             else:
-                probs = self.model.predict(denoise_source.X)
+                probs = classifier_model.predict(denoise_source_x)
                 init_preds = np.argmax(probs, axis=1)
                 print(
                     f"      -> Starting MMD Calibration at {time.strftime('%H:%M:%S')}...",
@@ -139,8 +138,11 @@ class DeepCyTOFRunner:
                 )
 
             print(f"      -> Running final classification...", flush=True)
-            final_probs = self.model.predict(
-                calibrated_source.X, batch_size=pred_batch_size, verbose=0
+            if calibrated_source.X is None:
+                raise ValueError("DeepCyTOF calibrated source matrix is missing.")
+            calibrated_source_x = cast(np.ndarray, calibrated_source.X)
+            final_probs = classifier_model.predict(
+                calibrated_source_x, batch_size=pred_batch_size, verbose=0
             )
             final_indices.append(np.argmax(final_probs, axis=1))
 

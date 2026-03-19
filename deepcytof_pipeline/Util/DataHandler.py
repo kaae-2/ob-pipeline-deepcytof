@@ -23,24 +23,22 @@ class Sample:
         self.y = y
 
 def preProcessSamplesCyTOFData(sample):
-    sample.X = np.log(1 + np.abs(sample.X))    
     return sample
 
 def standard_scale(sample, preprocessor = None):
-    if preprocessor == None:
-        preprocessor = prep.StandardScaler().fit(sample.X)
-    sample.X = preprocessor.transform(sample.X)
-    
     return sample, preprocessor
 
 def loadDeepCyTOFData(dataPath, dataIndex, relevantMarkers, mode, skip_header = 0):
+    X = None
     if mode == 'CSV':
         data_filename = dataPath + '/sample' + str(dataIndex)+'.csv'
         X = genfromtxt(os.path.join(io.DeepLearningRoot(),data_filename), delimiter=',', skip_header=skip_header)
     if mode == 'FCS':
         data_filename = dataPath + '/sample' + str(dataIndex)+'.fcs'
-        _, X = fcsparser.parse(os.path.join(io.DeepLearningRoot() ,data_filename), reformat_meta=True)
-        X = X.as_matrix()
+        _, fcs_frame = fcsparser.parse(os.path.join(io.DeepLearningRoot() ,data_filename), reformat_meta=True)
+        X = fcs_frame.as_matrix()
+    if X is None:
+        raise ValueError('Unsupported mode: %s' % mode)
     X = X[:, relevantMarkers]    
     label_filename = dataPath + '/labels' + str(dataIndex) + '.csv'
     labels = genfromtxt(os.path.join(io.DeepLearningRoot(),label_filename), delimiter=',')
@@ -64,6 +62,7 @@ def chooseReferenceSample(dataPath, dataIndex, relevantMarkers, mode, choice):
         samples.append(sample)
         
     numSamples = len(samples)
+    refSampleInd = 0
     norms = np.zeros(shape = [numSamples, numSamples])
     for i in range(numSamples):
         cov_i = np.cov(samples[i].X, rowvar = False)

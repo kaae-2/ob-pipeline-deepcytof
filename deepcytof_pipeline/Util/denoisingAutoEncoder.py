@@ -54,9 +54,6 @@ def trainDAE(target, dataPath, refSampleInd, trainIndex, relevantMarkers, mode,
         else:
             sourceX = np.concatenate([sourceX, source.X[toKeepS]], axis = 0)
         
-    # preProcess source
-    sourceX = np.log(1 + np.abs(sourceX))
-    
     numZerosOK=1
     toKeepT = np.sum((target.X==0), axis = 1) <= numZerosOK
     
